@@ -65,17 +65,32 @@ class SpringPlatform(Platform):
 
 
 def generate_platforms(width: int, base_y: int, count: int = 30) -> list[Platform]:
-    """Generates ground floor and randomized ascending platforms."""
-    # Ground platform (always normal type)
+    """Generates guaranteed-reachable ascending platform chain."""
+    # Ground platform
     plats = [Platform(pygame.Rect(0, base_y, width, 20), p_type="normal")]
-    y = base_y - 110
+    
+    prev_x = width // 2 - 60
+    prev_w = 120
+    y = base_y - 85
+
+    MAX_JUMP_HEIGHT = 100  # Cap vertical distance to guarantee jump height
+    MAX_HORIZONTAL_REACH = 160  # Cap horizontal gap distance
 
     for _ in range(count):
-        w = random.randint(80, 200)
-        x = random.randint(0, width - w)
+        w = random.randint(90, 160)
+
+        # Calculate reachable horizontal X bounds relative to the previous platform
+        min_x = max(0, prev_x - MAX_HORIZONTAL_REACH)
+        max_x = min(width - w, prev_x + prev_w + MAX_HORIZONTAL_REACH - w)
+
+        if min_x > max_x:
+            x = random.randint(0, width - w)
+        else:
+            x = random.randint(min_x, max_x)
+
         rect = pygame.Rect(x, y, w, 16)
 
-        # Weighted probabilities: 60% Normal, 25% Crumbling, 15% Spring
+        # Weighted selection for platform types
         p_type = random.choices(
             ["normal", "crumbling", "spring"], weights=[0.60, 0.25, 0.15]
         )[0]
@@ -85,7 +100,10 @@ def generate_platforms(width: int, base_y: int, count: int = 30) -> list[Platfor
         else:
             plats.append(Platform(rect, p_type=p_type))
 
-        y -= random.randint(80, 130)
+        # Update tracking for next iteration
+        prev_x = x
+        prev_w = w
+        y -= random.randint(70, MAX_JUMP_HEIGHT)
 
     return plats
 
