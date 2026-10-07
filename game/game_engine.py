@@ -14,7 +14,7 @@ class GameEngine:
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Lava Escape")
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("monospace", 24, bold=True)
+        self.font = pygame.font.SysFont("monospace", 18, bold=True)
         self.big_font = pygame.font.SysFont("monospace", 42, bold=True)
         self.reset()
 
@@ -23,7 +23,10 @@ class GameEngine:
         self.player = Player(WIDTH // 2 - 16, GROUND_Y - 50)
         self.cam_y = 0
         self.lava_y = GROUND_Y + 60
+        self.base_lava_rise = 0.4
         self.lava_rise = 0.4
+        self.surge_timer = 0
+        self.surge_duration = 0
         self.score = 0
         self.game_over = False
         self.won = False
@@ -45,19 +48,35 @@ class GameEngine:
         keys = pygame.key.get_pressed()
         self.player.update(keys, self.platforms, WIDTH)
 
-        # Update platforms to process crumble timers
+        # Update platforms (crumbling timers)
         for p in self.platforms:
             p.update()
 
+        # Smooth camera tracking
         target = self.player.rect.centery - HEIGHT // 2
         if target < self.cam_y:
             self.cam_y = target
 
+        # --- Task 4: Base Lava Speed & Periodic Surge Logic ---
+        self.base_lava_rise = min(1.2, self.base_lava_rise + 0.0003)
+        self.surge_timer += 1
+
+        # Trigger surge phase every ~5 seconds (300 frames) for ~1.5 seconds (90 frames)
+        if self.surge_timer > 300:
+            self.surge_duration = 90
+            self.surge_timer = 0
+
+        if self.surge_duration > 0:
+            self.lava_rise = self.base_lava_rise * 2.5  # 2.5x speed surge multiplier
+            self.surge_duration -= 1
+        else:
+            self.lava_rise = self.base_lava_rise
+
         self.lava_y -= self.lava_rise
-        self.lava_rise = min(1.2, self.lava_rise + 0.0003)
         self.score = max(0, (GROUND_Y - self.player.rect.y) // 10)
         self.frame += 1
 
+        # Check Game Over / Victory
         if self.player.rect.bottom >= self.lava_y:
             self.game_over = True
         if self.player.rect.top <= self.top_y - 20:
@@ -66,15 +85,28 @@ class GameEngine:
     def draw(self):
         self.screen.fill(BG)
 
+        # Draw Platforms
         for p in self.platforms:
             p.draw(self.screen, self.cam_y)
 
+        # Draw Player & Lava
         self.player.draw(self.screen, self.cam_y)
         draw_lava(self.screen, self.lava_y, self.cam_y, WIDTH, HEIGHT, self.frame)
 
-        sc = self.font.render(f"Height: {self.score}m  R=Restart", True, (220, 200, 180))
+        # --- Task 4: Real-Time Danger Meter HUD ---
+        sc = self.font.render(
+            f"Height: {self.score}m  Lava Speed: {self.lava_rise:.2f}x",
+            True,
+            (220, 200, 180),
+        )
         self.screen.blit(sc, (8, 10))
 
+        # Flashing Lava Surge Warning Banner
+        if self.surge_duration > 0:
+            surge_txt = self.font.render("! LAVA SURGE WARNING !", True, (255, 60, 60))
+            self.screen.blit(surge_txt, (WIDTH // 2 - surge_txt.get_width() // 2, 35))
+
+        # Message Overlay
         if self.game_over:
             self._msg("LAVA GOT YOU!", (220, 80, 40))
         if self.won:
