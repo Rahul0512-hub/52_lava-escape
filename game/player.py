@@ -17,7 +17,7 @@ class Player:
         self.color = (60, 160, 220)
 
     def update(self, keys, platforms: list[Platform], width: int):
-        """Updates physics and handles platform landing/crumble triggers."""
+        """Updates physics and handles platform landing/spring launches."""
         # Horizontal Movement
         dx = 0
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
@@ -42,7 +42,6 @@ class Player:
 
         self.on_ground = False
         for p in platforms:
-            # Ignore platforms that have disintegrated
             if p.destroyed:
                 continue
 
@@ -55,11 +54,15 @@ class Player:
                 and self.rect.left < p.rect.right
             ):
                 self.rect.bottom = p.rect.top
-                self.on_ground = True
-
-                # Trigger landing effect (starts crumbling timer if applicable)
                 bounce_vel = p.trigger_land()
-                self.vel_y = 0
+
+                if p.type == "spring":
+                    # Instant launch upon touching spring platform surface
+                    self.vel_y = bounce_vel
+                    self.on_ground = False
+                else:
+                    self.vel_y = 0
+                    self.on_ground = True
                 break
 
     def draw(self, screen: pygame.Surface, cam_y: float):

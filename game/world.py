@@ -4,6 +4,7 @@ import pygame
 
 COLOR_NORMAL = (100, 80, 50)
 COLOR_CRUMBLING = (180, 100, 50)
+COLOR_SPRING = (50, 180, 100)
 LAVA_COLOR = (220, 60, 20)
 
 
@@ -12,7 +13,7 @@ class Platform:
 
     def __init__(self, rect: pygame.Rect, p_type: str = "normal"):
         self.rect = rect
-        self.type = p_type  # "normal" or "crumbling"
+        self.type = p_type  # "normal", "crumbling", "spring"
         self.stepped_on = False
         self.shake_timer = 0
         self.destroyed = False
@@ -42,8 +43,25 @@ class Platform:
             return
 
         dr = self.get_draw_rect(cam_y)
-        color = COLOR_CRUMBLING if self.type == "crumbling" else COLOR_NORMAL
+        color = COLOR_NORMAL
+        if self.type == "crumbling":
+            color = COLOR_CRUMBLING
+        elif self.type == "spring":
+            color = COLOR_SPRING
+
         pygame.draw.rect(screen, color, dr, border_radius=4)
+
+
+class SpringPlatform(Platform):
+    """Platform variant that launches player upward with bonus velocity."""
+
+    def __init__(self, rect: pygame.Rect):
+        super().__init__(rect, p_type="spring")
+
+    def trigger_land(self) -> float:
+        """Overrides jump velocity to provide high-velocity launch."""
+        super().trigger_land()
+        return -20.0  # High-velocity spring launch
 
 
 def generate_platforms(width: int, base_y: int, count: int = 30) -> list[Platform]:
@@ -57,9 +75,15 @@ def generate_platforms(width: int, base_y: int, count: int = 30) -> list[Platfor
         x = random.randint(0, width - w)
         rect = pygame.Rect(x, y, w, 16)
 
-        # ~30% chance to generate a crumbling platform
-        p_type = "crumbling" if random.random() < 0.30 else "normal"
-        plats.append(Platform(rect, p_type=p_type))
+        # Weighted probabilities: 60% Normal, 25% Crumbling, 15% Spring
+        p_type = random.choices(
+            ["normal", "crumbling", "spring"], weights=[0.60, 0.25, 0.15]
+        )[0]
+
+        if p_type == "spring":
+            plats.append(SpringPlatform(rect))
+        else:
+            plats.append(Platform(rect, p_type=p_type))
 
         y -= random.randint(80, 130)
 
