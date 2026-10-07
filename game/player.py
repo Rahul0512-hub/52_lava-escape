@@ -1,4 +1,5 @@
 import pygame
+from game.world import Platform
 
 SPEED = 4
 GRAVITY = 0.55
@@ -7,7 +8,7 @@ JUMP_STRENGTH = -13
 
 
 class Player:
-    """Represents the player avatar with jump physics and platform collisions."""
+    """Represents player character physics and collisions."""
 
     def __init__(self, x: float, y: float):
         self.rect = pygame.Rect(x, y, 32, 32)
@@ -15,14 +16,8 @@ class Player:
         self.on_ground = False
         self.color = (60, 160, 220)
 
-    def update(self, keys, platforms: list[pygame.Rect], width: int):
-        """Updates player position and resolves one-way platform landings.
-
-        Args:
-            keys: Pygame key state array.
-            platforms: List of platform Pygame Rect objects.
-            width: Game window width for edge boundary clamping.
-        """
+    def update(self, keys, platforms: list[Platform], width: int):
+        """Updates physics and handles platform landing/crumble triggers."""
         # Horizontal Movement
         dx = 0
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
@@ -39,33 +34,32 @@ class Player:
 
         # Apply Gravity
         self.vel_y = min(self.vel_y + GRAVITY, MAX_FALL_SPEED)
-
-        # Store bottom edge position BEFORE applying vertical movement
         prev_bottom = self.rect.bottom
 
-        # Apply Displacement
+        # Apply Movement
         self.rect.x = max(0, min(width - self.rect.width, self.rect.x + dx))
         self.rect.y += int(self.vel_y)
 
-        # Reset ground state prior to collision detection
         self.on_ground = False
-
-        # Landing Condition:
-        # 1. Player is moving downward (vel_y > 0).
-        # 2. Player was above or at platform surface before moving (prev_bottom <= p.top).
-        # 3. Player's feet overlap or cross below platform surface (self.rect.bottom >= p.top).
-        # 4. Player horizontally overlaps the platform.
         for p in platforms:
+            # Ignore platforms that have disintegrated
+            if p.destroyed:
+                continue
+
+            # Landing condition
             if (
                 self.vel_y > 0
-                and prev_bottom <= p.top
-                and self.rect.bottom >= p.top
-                and self.rect.right > p.left
-                and self.rect.left < p.right
+                and prev_bottom <= p.rect.top
+                and self.rect.bottom >= p.rect.top
+                and self.rect.right > p.rect.left
+                and self.rect.left < p.rect.right
             ):
-                self.rect.bottom = p.top
-                self.vel_y = 0
+                self.rect.bottom = p.rect.top
                 self.on_ground = True
+
+                # Trigger landing effect (starts crumbling timer if applicable)
+                bounce_vel = p.trigger_land()
+                self.vel_y = 0
                 break
 
     def draw(self, screen: pygame.Surface, cam_y: float):
